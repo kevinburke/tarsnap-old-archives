@@ -114,6 +114,8 @@ func main() {
 	twoYearsAgo := time.Date(now.Year()-2, now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	twoMonthsAgo := time.Date(now.Year(), now.Month()-2, now.Day(), 0, 0, 0, 0, time.UTC)
 	for currentIndex < len(matchedItems) {
+		dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
+		currentIndex++
 		periodStart := matchedItems[currentIndex].Date
 		// two years or more ago, one archive per month
 		// between two years and two months, one per week
@@ -128,8 +130,6 @@ func main() {
 			currentIndex++
 			continue
 		}
-		dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
-		currentIndex++
 		for currentIndex < len(matchedItems) {
 			if matchedItems[currentIndex].Date.Before(periodEnd) {
 				dryRunPrint(*dryRun, "discard", matchedItems[currentIndex].String())
