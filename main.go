@@ -206,7 +206,7 @@ func main() {
 				io.Copy(os.Stderr, buf)
 				log.Fatal(err)
 			}
-			for i := 1; i < len(args); i += 2 {
+			for i := 2; i < len(args); i += 2 {
 				fmt.Println("deleted", args[i])
 			}
 		}(args)
