@@ -114,9 +114,9 @@ func main() {
 	twoYearsAgo := time.Date(now.Year()-2, now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	twoMonthsAgo := time.Date(now.Year(), now.Month()-2, now.Day(), 0, 0, 0, 0, time.UTC)
 	for currentIndex < len(matchedItems) {
-		dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
-		currentIndex++
+		dryRunPrint(*dryRun, "keep1", matchedItems[currentIndex].String())
 		periodStart := matchedItems[currentIndex].Date
+		currentIndex++
 		// two years or more ago, one archive per month
 		// between two years and two months, one per week
 		// sooner than two months, all
@@ -126,7 +126,6 @@ func main() {
 		} else if periodStart.Add(7 * 24 * time.Hour).Before(twoMonthsAgo) {
 			periodEnd = periodStart.Add(7 * 24 * time.Hour)
 		} else {
-			dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
 			currentIndex++
 			continue
 		}
@@ -137,7 +136,7 @@ func main() {
 				currentIndex++
 				continue
 			}
-			dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
+			// keep the next item, which is outside the period.
 			break
 		}
 	}
@@ -151,19 +150,19 @@ func main() {
 		go func(name string) {
 			buf := new(bytes.Buffer)
 			defer s.Release()
-			cmd := exec.CommandContext(ctx, "tarsnap", "-d", "-f", discardItems[i].Name)
+			cmd := exec.CommandContext(ctx, "tarsnap", "-d", "-f", name)
 			cmd.Stdout = buf
 			cmd.Stderr = buf
 			if err := cmd.Run(); err != nil {
 				if strings.Contains(buf.String(), "Archive does not exist") {
-					fmt.Println("gone   ", discardItems[i].Name)
+					fmt.Println("gone   ", name)
 					return
 				}
 				cancel()
 				io.Copy(os.Stderr, buf)
 				log.Fatal(err)
 			}
-			fmt.Println("deleted", discardItems[i].Name)
+			fmt.Println("deleted", name)
 		}(discardItems[i].Name)
 	}
 }
