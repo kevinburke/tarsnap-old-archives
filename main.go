@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -64,6 +65,8 @@ func dryRunPrint(dryRun bool, args ...interface{}) {
 func main() {
 	dryRun := flag.Bool("dry-run", true, "Dry run mode")
 	file := flag.String("file", "", "Name of file to load archives from")
+	// one entry per line
+	alreadyDeleted := flag.String("already-deleted-file", "", "Name of file to load already deleted archives from")
 	var regex string
 	flag.StringVar(&regex, "archive-regex", "", "Regular expression to match archives against")
 	flag.Parse()
@@ -79,6 +82,19 @@ func main() {
 	rx, err := regexp.Compile(regex)
 	if err != nil {
 		log.Fatal(err)
+	}
+	alreadyDeletedMap := make(map[string]bool)
+	if *alreadyDeleted != "" {
+		data, err := ioutil.ReadFile(*alreadyDeleted)
+		if err != nil {
+			log.Fatal(err)
+		}
+		lines := strings.Split(string(data), "\n")
+		for i := 0; i < len(lines); i++ {
+			if lines[i] != "" {
+				alreadyDeletedMap[lines[i]] = true
+			}
+		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	var archives io.Reader
@@ -130,6 +146,11 @@ func main() {
 			continue
 		}
 		for currentIndex < len(matchedItems) {
+			if alreadyDeletedMap[matchedItems[currentIndex].Name] {
+				fmt.Println("gone   ", matchedItems[currentIndex].Name)
+				currentIndex++
+				continue
+			}
 			if matchedItems[currentIndex].Date.Before(periodEnd) {
 				dryRunPrint(*dryRun, "discard", matchedItems[currentIndex].String())
 				discardItems = append(discardItems, matchedItems[currentIndex])
@@ -146,6 +167,11 @@ func main() {
 	// Tarsnap does not permit concurrent operations
 	s := semaphore.New(1)
 	for i := range discardItems {
+		name := discardItems[i].Name
+		if alreadyDeletedMap[name] {
+			fmt.Println("gone   ", name)
+			continue
+		}
 		s.Acquire()
 		go func(name string) {
 			buf := new(bytes.Buffer)
@@ -163,6 +189,6 @@ func main() {
 				log.Fatal(err)
 			}
 			fmt.Println("deleted", name)
-		}(discardItems[i].Name)
+		}(name)
 	}
 }
