@@ -64,6 +64,7 @@ func dryRunPrint(dryRun bool, args ...interface{}) {
 
 func main() {
 	dryRun := flag.Bool("dry-run", true, "Dry run mode")
+	multi := flag.Bool("multi", true, "Multi at once")
 	file := flag.String("file", "", "Name of file to load archives from")
 	// one entry per line
 	alreadyDeleted := flag.String("already-deleted-file", "", "Name of file to load already deleted archives from")
@@ -166,29 +167,48 @@ func main() {
 	}
 	// Tarsnap does not permit concurrent operations
 	s := semaphore.New(1)
-	for i := range discardItems {
-		name := discardItems[i].Name
-		if alreadyDeletedMap[name] {
-			fmt.Println("gone   ", name)
-			continue
+	for i := 0; i < len(discardItems); {
+		args := make([]string, 1)
+		args[0] = "-d"
+		initialIndex := i
+		if *multi {
+			for j := initialIndex; j < initialIndex+100 && j < len(discardItems); j++ {
+				name := discardItems[j].Name
+				if alreadyDeletedMap[name] {
+					fmt.Println("gone   ", name)
+					continue
+				}
+				args = append(args, "-f", name)
+				i++
+			}
+		} else {
+			name := discardItems[i].Name
+			if alreadyDeletedMap[name] {
+				fmt.Println("gone   ", name)
+				continue
+			}
+			args = append(args, "-f", discardItems[i].Name)
+			i++
 		}
 		s.Acquire()
-		go func(name string) {
+		go func(args []string) {
 			buf := new(bytes.Buffer)
 			defer s.Release()
-			cmd := exec.CommandContext(ctx, "tarsnap", "-d", "-f", name)
+			cmd := exec.CommandContext(ctx, "tarsnap", args...)
 			cmd.Stdout = buf
 			cmd.Stderr = buf
 			if err := cmd.Run(); err != nil {
 				if strings.Contains(buf.String(), "Archive does not exist") {
-					fmt.Println("gone   ", name)
+					fmt.Println("gone   ", args)
 					return
 				}
 				cancel()
 				io.Copy(os.Stderr, buf)
 				log.Fatal(err)
 			}
-			fmt.Println("deleted", name)
-		}(name)
+			for i := 1; i < len(args); i += 2 {
+				fmt.Println("deleted", args[i])
+			}
+		}(args)
 	}
 }
