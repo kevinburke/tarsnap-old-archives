@@ -164,6 +164,11 @@ func main() {
 	twoYearsAgo := time.Date(now.Year()-2, now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	twoMonthsAgo := time.Date(now.Year(), now.Month()-2, now.Day(), 0, 0, 0, 0, time.UTC)
 	for currentIndex < len(matchedItems) {
+		if alreadyDeletedMap[matchedItems[currentIndex].Name] {
+			fmt.Println("gone   ", matchedItems[currentIndex].Name)
+			currentIndex++
+			continue
+		}
 		dryRunPrint(*dryRun, "keep", matchedItems[currentIndex].String())
 		periodStart := matchedItems[currentIndex].Date
 		currentIndex++
