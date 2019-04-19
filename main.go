@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kevinburke/semaphore"
@@ -42,16 +43,19 @@ func deleteArchives(ctx context.Context, archives []string) error {
 		args[i*2+2] = archives[i]
 	}
 	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
 	cmd := exec.CommandContext(ctx, "tarsnap", args...)
 	cmd.Stdout = buf
-	cmd.Stderr = buf
-	if err := cmd.Run(); err != nil {
-		if strings.Contains(buf.String(), "Archive does not exist") {
+	cmd.Stderr = errBuf
+	err := cmd.Run()
+	if err != nil {
+		if strings.Contains(errBuf.String(), "Archive does not exist") {
 			return errAlreadyDeleted
 		}
-		io.Copy(os.Stderr, buf)
+		io.Copy(os.Stderr, errBuf)
 		return err
 	}
+	io.Copy(os.Stderr, errBuf)
 	for i := 2; i < len(args); i += 2 {
 		fmt.Println("deleted", args[i])
 	}
@@ -203,6 +207,7 @@ func main() {
 	if *dryRun {
 		return
 	}
+	var wg sync.WaitGroup
 	s := semaphore.New(concurrency)
 	for i := 0; i < len(discardItems); {
 		archives := make([]string, 0)
@@ -217,8 +222,10 @@ func main() {
 			i++
 		}
 		s.Acquire()
-		go func(archives []string) {
+		wg.Add(1)
+		go func(archives_ []string) {
 			defer s.Release()
+			defer wg.Done()
 			if err := deleteArchives(ctx, archives); err != nil {
 				if err == errAlreadyDeleted {
 					// delete one by one
@@ -239,4 +246,5 @@ func main() {
 			}
 		}(archives)
 	}
+	wg.Wait()
 }
