@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -123,7 +122,7 @@ func main() {
 	}
 	alreadyDeletedMap := make(map[string]bool)
 	if *alreadyDeleted != "" {
-		data, err := ioutil.ReadFile(*alreadyDeleted)
+		data, err := os.ReadFile(*alreadyDeleted)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -150,6 +149,12 @@ func main() {
 			log.Fatal(err)
 		}
 		archives = buf
+		tmp, err := os.CreateTemp("", "tarsnap-old-archives-")
+		if err == nil {
+			io.Copy(tmp, buf)
+			fmt.Println("wrote archive output to", tmp.Name())
+			tmp.Close()
+		}
 	}
 	items, err := getArchiveItems(archives)
 	if err != nil {
